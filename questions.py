@@ -6,6 +6,21 @@ Format: (statement, is_true, fun_fact)
 
 QUESTIONS = [
     (
+        "SpongeBob was originally going to be called SpongeBoy.",
+        True,
+        "The name SpongeBoy was already trademarked by another company, so the creators had to change it to SpongeBob."
+    ),
+    (
+        "The best selling video game of all time is Tetris.",
+        True,
+        "Tetris has sold over 520 million copies across all versions and platforms, making it the best selling game ever."
+    ),
+    (
+        "A giraffe's tongue is black or dark purple.",
+        True,
+        "Giraffes have dark bluish-purple tongues, thought to protect them from sunburn while they eat leaves all day!"
+    ),
+    (
         "A group of flamingos is called a flamboyance.",
         True,
         "Yes! And they're pink because of the shrimp they eat."
@@ -13,7 +28,7 @@ QUESTIONS = [
     (
         "The Great Wall of China can be seen from space with the naked eye.",
         False,
-        "Nope! That's a popular myth — the wall is far too narrow to spot from space."
+        "Nope! That's a popular myth the wall is far too narrow to spot from space."
     ),
     (
         "Octopuses have three hearts.",
@@ -28,7 +43,7 @@ QUESTIONS = [
     (
         "Sharks are the only fish that can blink.",
         False,
-        "Actually sharks have no eyelids at all — they can't blink!"
+        "Actually sharks have no eyelids at all. they can't blink!"
     ),
     (
         "Butterflies taste with their feet.",
@@ -53,7 +68,7 @@ QUESTIONS = [
     (
         "The tallest mountain measured from base to peak is Mount Everest.",
         False,
-        "Surprise! Mauna Kea in Hawaii is taller from base to peak — most of it is just underwater."
+        "Surprise! Mauna Kea in Hawaii is taller from base to peak. Most of it is just underwater."
     ),
     (
         "Bananas are technically berries.",
@@ -73,7 +88,7 @@ QUESTIONS = [
     (
         "Cats always land on their feet.",
         False,
-        "They often do thanks to a special reflex, but not always — cats can still get hurt falling."
+        "They often do thanks to a special reflex, but not always. cats can still get hurt falling."
     ),
     (
         "Lightning never strikes the same place twice.",
@@ -83,7 +98,7 @@ QUESTIONS = [
     (
         "The human body has more bacterial cells than human cells.",
         True,
-        "You're more bacteria than human by cell count! Don't worry though — most of them are helpful."
+        "You're more bacteria than human by cell count! Don't worry though. most of them are helpful."
     ),
     (
         "Worms have a brain.",
@@ -98,12 +113,12 @@ QUESTIONS = [
     (
         "You can hear a blue whale's call from over 800 kilometres away.",
         True,
-        "Blue whales are the loudest animals on Earth — their calls travel enormous distances underwater."
+        "Blue whales are the loudest animals on Earth. their calls travel enormous distances underwater."
     ),
     (
         "Dogs can only see in black and white.",
         False,
-        "Dogs can see colours — just not as many as humans. They see blues and yellows well."
+        "Dogs can see colours just not as many as humans. They see blues and yellows well."
     ),
     (
         "The moon has its own light.",
@@ -113,7 +128,7 @@ QUESTIONS = [
     (
         "A group of cats is called a clowder.",
         True,
-        "Yep — a clowder of cats. You're welcome for that fact."
+        "Yep a clowder of cats. You're welcome for that fact."
     ),
     (
         "Spaghetti was invented in China.",
@@ -123,7 +138,7 @@ QUESTIONS = [
     (
         "Polar bears have black skin under their white fur.",
         True,
-        "Their skin is black to absorb heat from the Sun — and their fur is actually transparent, not white!"
+        "Their skin is black to absorb heat from the Sun and their fur is actually transparent, not white!"
     ),
     (
         "The heart of a shrimp is in its head.",
@@ -138,7 +153,7 @@ QUESTIONS = [
     (
         "Penguins live at the North Pole.",
         False,
-        "Penguins live in the Southern Hemisphere — Antarctica mostly. Polar bears live in the Arctic north."
+        "Penguins live in the Southern Hemisphere Antarctica mostly. Polar bears live in the Arctic north."
     ),
     (
         "Trees communicate with each other through underground fungal networks.",
@@ -148,12 +163,12 @@ QUESTIONS = [
     (
         "An ostrich's eye is bigger than its brain.",
         True,
-        "Each ostrich eye is about the size of a billiard ball — bigger than their entire brain!"
+        "Each ostrich eye is about the size of a billiard ball bigger than their entire brain!"
     ),
     (
         "You lose most body heat through your head.",
         False,
-        "Another myth! You lose heat evenly across your whole body — the head is nothing special."
+        "Another myth! You lose heat evenly across your whole body  the head is nothing special."
     ),
     (
         "A jiffy is an actual unit of time.",
@@ -178,7 +193,7 @@ QUESTIONS = [
     (
         "There are more possible chess games than atoms in the observable universe.",
         True,
-        "The number of possible chess games is unimaginably large — far more than all the atoms we can detect!"
+        "The number of possible chess games is unimaginably large. far more than all the atoms we can detect!"
     ),
     (
         "Humans share 50 percent of their DNA with bananas.",
@@ -188,7 +203,7 @@ QUESTIONS = [
     (
         "Sound travels faster through water than through air.",
         True,
-        "Sound travels about four times faster through water than air — which is why whales can communicate so far."
+        "Sound travels about four times faster through water than air. which is why whales can communicate so far."
     ),
     (
         "The first Olympic Games were held in Greece.",
