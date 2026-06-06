@@ -39,7 +39,7 @@ pip install -r requirements.txt
 - Follow the [Headless/CLI auth guide](https://yoto.dev/authentication/headless-cli-auth/) to get an access token OR go to https://github.com/Ciaralooney/Yoto-Access-Token-Generator for a simpler way to do this
 
 ### 4. Create your .env file
-Make an .env file and fill in `ELEVENLABS_API_KEY` and `YOTO_ACCESS_TOKEN`.
+Make an .env file and fill in `ELEVENLABS_API_KEY`, `YOTO_VOICE_ID_TRIVIA` and `YOTO_ACCESS_TOKEN`.
 
 ## Deploy the server
 You need this running somewhere permanently. What I suggest:

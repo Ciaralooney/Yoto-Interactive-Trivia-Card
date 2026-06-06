@@ -11,14 +11,19 @@ import os
 
 load_dotenv()
 
-# ─────────────────────────────────────────────
 # Loading API Keys
-# ─────────────────────────────────────────────
 YOTO_ACCESS_TOKEN = os.getenv("YOTO_ACCESS_TOKEN")
 SERVER_URL        = os.getenv("SERVER_URL")
 LABS_API          = "https://labs.api.yotoplay.com/content/job"
 VOICE_ID          = os.getenv("YOTO_VOICE_ID")
 CARD_TITLE        = "True or False Trivia!"
+
+ICONS_BASE = "https://raw.githubusercontent.com/Ciaralooney/Yoto-Interactive-Trivia-Card/main/images"
+ICON_WELCOME  = f"{ICONS_BASE}/hello.png"
+ICON_QUESTION = f"{ICONS_BASE}/question.png"
+ICON_TRUE     = f"{ICONS_BASE}/true.png"
+ICON_FALSE    = f"{ICONS_BASE}/false.png"
+ICON_SCORE    = f"{ICONS_BASE}/score.png"
 
 
 def headers():
@@ -44,7 +49,7 @@ def build_card_structure():
         {
             "key":   "01",
             "title": "Welcome",
-            "display": {"icon16x16": None},
+            "display": {"icon16x16": ICON_WELCOME},
             "tracks": [
                 {
                     "key":          "01",
@@ -52,7 +57,7 @@ def build_card_structure():
                     "trackUrl":     f"{base}/welcome",
                     "type":         "stream",
                     "overlayLabel": "▶",
-                    "display":      {"icon16x16": None},
+                    "display":      {"icon16x16": ICON_WELCOME},
                     "format":       "mp3",
                     "duration":     20,
                     "fileSize":     0,
@@ -63,7 +68,7 @@ def build_card_structure():
         {
             "key":   "02",
             "title": "Game",
-            "display": {"icon16x16": None},
+            "display": {"icon16x16": ICON_QUESTION},
             "tracks": [
                 {
                     "key":          "01",
@@ -71,7 +76,7 @@ def build_card_structure():
                     "trackUrl":     f"{base}/question",
                     "type":         "stream",
                     "overlayLabel": "?",
-                    "display":      {"icon16x16": None},
+                    "display":      {"icon16x16": ICON_QUESTION},
                     "format":       "mp3",
                     "duration":     15,
                     "fileSize":     0,
@@ -83,7 +88,7 @@ def build_card_structure():
                     "trackUrl":     f"{base}/true",
                     "type":         "stream",
                     "overlayLabel": "T",
-                    "display":      {"icon16x16": None},
+                    "display":      {"icon16x16": ICON_TRUE},
                     "format":       "mp3",
                     "duration":     15,
                     "fileSize":     0,
@@ -95,7 +100,7 @@ def build_card_structure():
                     "trackUrl":     f"{base}/false",
                     "type":         "stream",
                     "overlayLabel": "F",
-                    "display":      {"icon16x16": None},
+                    "display":      {"icon16x16": ICON_FALSE},
                     "format":       "mp3",
                     "duration":     15,
                     "fileSize":     0,
@@ -106,7 +111,7 @@ def build_card_structure():
         {
             "key":   "03",
             "title": "Score",
-            "display": {"icon16x16": None},
+            "display": {"icon16x16": ICON_SCORE},
             "tracks": [
                 {
                     "key":          "01",
@@ -114,7 +119,7 @@ def build_card_structure():
                     "trackUrl":     f"{base}/score",
                     "type":         "stream",
                     "overlayLabel": "★",
-                    "display":      {"icon16x16": None},
+                    "display":      {"icon16x16": ICON_SCORE},
                     "format":       "mp3",
                     "duration":     20,
                     "fileSize":     0,
