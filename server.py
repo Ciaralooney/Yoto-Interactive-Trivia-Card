@@ -212,6 +212,11 @@ async def _start_mqtt():
         client = YotoClient(client_id=YOTO_CLIENT_ID)
         client.set_refresh_token(YOTO_REFRESH_TOKEN)
         await client.check_and_refresh_token()
+        await client.update_player_list()
+        if YOTO_DEVICE_ID not in client.players:
+            log.warning(
+                f"YOTO_DEVICE_ID {YOTO_DEVICE_ID} not found in account's device list ({list(client.players)}) — check the ID is correct."
+            )
         yoto_client = client
         await yoto_client.connect_events([YOTO_DEVICE_ID], on_update=_on_player_update)
         log.info(f"MQTT connected for device {YOTO_DEVICE_ID}")
