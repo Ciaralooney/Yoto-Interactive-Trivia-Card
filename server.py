@@ -1,25 +1,28 @@
 """
-  GET /welcome          - intro audio, starts a new game session
-  GET /question         - reads the current question (and any pending feedback)
-  GET /true             - silent-ish placeholder, landing spot for "True"
-  GET /false            - silent-ish placeholder, landing spot for "False"
-  GET /score            - final score reveal
+Endpoints (still hit directly by the Yoto card's tracks):
+  GET /welcome            intro audio, starts a new game session
+  GET /question           reads the current question (and any pending feedback)
+  GET /true               silent-ish placeholder, landing spot for "True"
+  GET /false              silent-ish placeholder, landing spot for "False"
+  GET /score              final score reveal
 
 How branching works:
   1. Yoto card plays Question -> player presses the right button (True)
      or the left button (False) -> native nav lands them on the
      True or False track.
-  2. MQTT listener sees track_key become "02" (True) or "03"
+  2. Our MQTT listener sees track_key become "02" (True) or "03"
      (False) in the live event stream.
   3. Answer is scored server-side, store the feedback text for
      the NEXT /question call, and immediately call play_card() to
-     jump the player back to the Question track. Which now serves
-     the next question with spoken feedback on the previous answer.
+     jump the player back to the Question track which now serves
+     the next question with spoken feedback on the
+     previous answer.
 """
 
 import os
 import random
 import time
+import datetime
 import logging
 import asyncio
 import requests
@@ -28,7 +31,7 @@ from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-from yoto_api import YotoClient
+from yoto_api import YotoClient, Token
 
 from questions import QUESTIONS
 
@@ -36,6 +39,53 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
+
+# yoto_api._build_token() raises if Yoto's refresh response is missing
+# "refresh_token". This makes it fall
+# back to the previous refresh_token (passed in via `prev_refresh`)
+# rather than blow up, which is the correct behavior when rotation
+# is disabled.
+import yoto_api.auth as _yoto_auth_module
+from yoto_api.exceptions import YotoAPIError as _YotoAPIError
+
+_original_build_token = _yoto_auth_module._build_token
+
+
+def _patched_build_token(body, scope, prev_refresh=None):
+    if "refresh_token" not in body and prev_refresh is not None:
+        body = {**body, "refresh_token": prev_refresh}
+    return _original_build_token(body, scope)
+
+
+def _patched_refresh(self_auth, token):
+    async def _inner():
+        import aiohttp
+        data = {
+            "client_id": self_auth.client_id,
+            "grant_type": "refresh_token",
+            "refresh_token": token.refresh_token,
+            "audience": "https://api.yotoplay.com",
+        }
+        try:
+            async with self_auth._session.post(
+                "https://login.yotoplay.com/oauth/token",
+                data=data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            ) as response:
+                resp_body = await response.json(content_type=None)
+        except Exception as err:
+            raise _YotoAPIError(f"Refresh token request failed: {err}") from err
+        if resp_body.get("error"):
+            from yoto_api.exceptions import AuthenticationError
+            raise AuthenticationError("Refresh token invalid")
+        return _patched_build_token(
+            resp_body, scope=token.scope, prev_refresh=token.refresh_token
+        )
+    return _inner()
+
+
+_yoto_auth_module.Auth.refresh = _patched_refresh
+# --- End patch ---------------------------------------------------------
 
 # API Setup
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
@@ -45,9 +95,10 @@ ELEVENLABS_URL     = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}/st
 
 YOTO_CLIENT_ID     = os.getenv("YOTO_CLIENT_ID")
 YOTO_REFRESH_TOKEN = os.getenv("YOTO_REFRESH_TOKEN")
+YOTO_ACCESS_TOKEN  = os.getenv("YOTO_ACCESS_TOKEN")
 YOTO_DEVICE_ID     = os.getenv("YOTO_DEVICE_ID")
 
-# Chapter/track keys, match build_card.py
+# Chapter/track keys, must match build_card.py
 CHAPTER_GAME  = "02"
 TRACK_QUESTION = "01"
 TRACK_TRUE     = "02"
@@ -56,10 +107,11 @@ TRACK_FALSE    = "03"
 # Session setup
 sessions: dict[str, dict] = {}
 
+# Module-level handle to the Yoto client + the card_id.
 yoto_client: YotoClient | None = None
 YOTO_CARD_ID = os.getenv("YOTO_CARD_ID")
 
-# Tracks the last (chapter_key, track_key)
+# Tracks the last (chapter_key, track_key) per device,
 _last_seen_track: dict[str, tuple[str, str]] = {}
 
 
@@ -74,7 +126,7 @@ def new_session(player_id: str) -> dict:
         "current":        0,       # index of current question
         "score":          0,
         "started":        time.time(),
-        "pending_feedback": None,  # text to prepend to the next question read
+        "pending_feedback": None,  # text to prepend to the next /question read
     }
     sessions[player_id] = session
     log.info(f"New session for player {player_id}")
@@ -133,12 +185,13 @@ def player_id_from_request(request: Request) -> str:
     )
 
 
-# Branching / scoring logic
+# Branching / scoring logic (shared by the MQTT handler)
+
 def _score_answer(session: dict, answered_true: bool) -> str:
     """
     Score the current question against the given answer, advance
     session state, and return the feedback text to read out before
-    the next question (or before the final score).
+    the next question 
     """
     q = current_question(session)
     if not q:
@@ -153,13 +206,14 @@ def _score_answer(session: dict, answered_true: bool) -> str:
         result = f"Yes, that's correct! {fun_fact} You've got {score} right so far."
     else:
         right_answer = "true" if is_true else "false"
-        result = f"Ooh, not quite - that one was {right_answer}! {fun_fact}"
+        result = f"Ooh, not quite   that one was {right_answer}! {fun_fact}"
 
     session["current"] += 1
     return result
 
 
 # MQTT event handling
+
 async def _on_player_update(player) -> None:
     """
     Called by yoto_api whenever a player's live state changes. 
@@ -202,7 +256,7 @@ async def _on_player_update(player) -> None:
 
     try:
         if remaining > 0:
-            # Jump back to /question so it will read the
+            # Jump back to the Question track   /question will read the
             # pending feedback, then the next question.
             await yoto_client.play_card(
                 device_id,
@@ -211,7 +265,7 @@ async def _on_player_update(player) -> None:
                 track_key=TRACK_QUESTION,
             )
         else:
-            # Game's finished so jump to the Score chapter.
+            # Game's finished   jump to the Score chapter.
             await yoto_client.play_card(
                 device_id,
                 YOTO_CARD_ID,
@@ -227,7 +281,7 @@ async def _start_mqtt():
 
     if not (YOTO_CLIENT_ID and YOTO_REFRESH_TOKEN and YOTO_DEVICE_ID):
         log.warning(
-            "YOTO_CLIENT_ID / YOTO_REFRESH_TOKEN / YOTO_DEVICE_ID not all set - "
+            "YOTO_CLIENT_ID / YOTO_REFRESH_TOKEN / YOTO_DEVICE_ID not all set   "
             "MQTT branching is disabled. The server will still stream audio, "
             "but answers won't be detected."
         )
@@ -235,18 +289,33 @@ async def _start_mqtt():
 
     if not YOTO_CARD_ID:
         log.warning(
-            "YOTO_CARD_ID not set - MQTT branching is disabled until it's configured, "
+            "YOTO_CARD_ID not set   MQTT branching is disabled until it's configured, "
             "since we need it to know which card to redirect playback on."
         )
         return
 
-    client = YotoClient(client_id=YOTO_CLIENT_ID)
-    client.set_refresh_token(YOTO_REFRESH_TOKEN)
-    await client.check_and_refresh_token()
+    try:
+        client = YotoClient(client_id=YOTO_CLIENT_ID)
+        client.set_refresh_token(YOTO_REFRESH_TOKEN)
+        await client.check_and_refresh_token()
 
-    yoto_client = client
-    await yoto_client.connect_events([YOTO_DEVICE_ID], on_update=_on_player_update)
-    log.info(f"MQTT connected for device {YOTO_DEVICE_ID}")
+        yoto_client = client
+        await yoto_client.connect_events([YOTO_DEVICE_ID], on_update=_on_player_update)
+        log.info(f"MQTT connected for device {YOTO_DEVICE_ID}")
+    except Exception:
+        # MQTT/branching is a bonus feature on top of basic audio
+        # streaming   if it fails to start (bad token, network issue,
+        # whatever), the server should still come up and serve
+        # /welcome, /question, /score etc. normally.
+        log.exception(
+            "Failed to start MQTT   branching will be disabled, but "
+            "audio streaming will still work."
+        )
+        try:
+            await client.close()
+        except Exception:
+            pass
+        yoto_client = None
 
 
 @asynccontextmanager
@@ -291,7 +360,7 @@ async def welcome(request: Request):
 async def question(request: Request):
     """
     Reads any pending feedback from the previous answer, then the
-    current question.
+    current question aloud.
     """
     pid     = player_id_from_request(request)
     session = get_session(pid)
@@ -324,7 +393,7 @@ async def question(request: Request):
 async def true_placeholder(request: Request):
     """
     Landing spot for a True answer. The MQTT listener detects this
-    landing and redirects playback. This response is a short filler
+    landing and redirects playback   this response is a short filler
     in case the redirect doesn't beat native playback.
     """
     return audio_response(" ")
@@ -333,7 +402,7 @@ async def true_placeholder(request: Request):
 @app.get("/false")
 async def false_placeholder(request: Request):
     """
-    Landing spot for a False answer. Same as /true.
+    Landing spot for a False answer. Same idea as /true.
     """
     return audio_response(" ")
 
@@ -347,21 +416,21 @@ async def score(request: Request):
     session = get_session(pid)
 
     if not session:
-        return audio_response("I couldn't find your score - sorry about that! Insert the card again to play.")
+        return audio_response("I couldn't find your score   sorry about that! Insert the card again to play.")
 
     s     = session["score"]
     total = QUESTIONS_PER_GAME
 
     if s == total:
-        verdict = "Absolutely perfect! A flawless ten out of ten - you're a trivia genius!"
+        verdict = "Absolutely perfect! A flawless ten out of ten   you're a trivia genius!"
     elif s >= 8:
-        verdict = f"Amazing! {s} out of {total} - you really know your stuff!"
+        verdict = f"Amazing! {s} out of {total}   you really know your stuff!"
     elif s >= 6:
-        verdict = f"Great effort! {s} out of {total} - well done!"
+        verdict = f"Great effort! {s} out of {total}   well done!"
     elif s >= 4:
-        verdict = f"Not bad! {s} out of {total} - keep practising and you'll smash it next time!"
+        verdict = f"Not bad! {s} out of {total}   keep practising and you'll smash it next time!"
     else:
-        verdict = f"You got {s} out of {total}. Keep going - every game you'll learn something new!"
+        verdict = f"You got {s} out of {total}. Keep going   every game you'll learn something new!"
 
     text = (
         f"Game over! {verdict} "
