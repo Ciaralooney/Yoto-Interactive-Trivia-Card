@@ -68,9 +68,10 @@ YOTO_REFRESH_TOKEN = os.getenv("YOTO_REFRESH_TOKEN")
 YOTO_ACCESS_TOKEN = os.getenv("YOTO_ACCESS_TOKEN")
 YOTO_DEVICE_ID = os.getenv("YOTO_DEVICE_ID")
 CHAPTER_GAME = "02"
-TRACK_TRUE = "01"
+TRACK_ENTRY = "01"
+TRACK_FALSE = "01"
 TRACK_QUESTION = "02"
-TRACK_FALSE = "03"
+TRACK_TRUE = "03"
 sessions: dict[str, dict] = {}
 yoto_client: YotoClient | None = None
 YOTO_CARD_ID = os.getenv("YOTO_CARD_ID")
@@ -177,7 +178,7 @@ async def _on_player_update(player) -> None:
     if _last_seen_track.get(device_id) == dedup_signal:
         return
     _last_seen_track[device_id] = dedup_signal
-    if track_key == TRACK_TRUE and (not session.get("question_asked")):
+    if track_key == TRACK_ENTRY and (not session.get("question_asked")):
         log.info(f"Player {pid} arrived in Game chapter, redirecting to Question")
         try:
             await yoto_client.play_card(
