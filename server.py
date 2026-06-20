@@ -1,5 +1,4 @@
 """
-Endpoints (still hit directly by the Yoto card's tracks):
   GET /welcome            intro audio, starts a new game session
   GET /question           reads the current question (and any pending feedback)
   GET /true               silent-ish placeholder, landing spot for "True"
