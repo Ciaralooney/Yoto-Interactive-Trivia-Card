@@ -68,13 +68,13 @@ YOTO_REFRESH_TOKEN = os.getenv("YOTO_REFRESH_TOKEN")
 YOTO_ACCESS_TOKEN = os.getenv("YOTO_ACCESS_TOKEN")
 YOTO_DEVICE_ID = os.getenv("YOTO_DEVICE_ID")
 CHAPTER_GAME = "02"
-TRACK_QUESTION = "01"
-TRACK_TRUE = "02"
+TRACK_TRUE = "01"
+TRACK_QUESTION = "02"
 TRACK_FALSE = "03"
 sessions: dict[str, dict] = {}
 yoto_client: YotoClient | None = None
 YOTO_CARD_ID = os.getenv("YOTO_CARD_ID")
-_last_seen_track: dict[str, tuple[str, str]] = {}
+_last_seen_track: dict[str, tuple[int, bool, str, str]] = {}
 
 
 def get_session(player_id: str) -> dict:
@@ -89,6 +89,7 @@ def new_session(player_id: str) -> dict:
         "score": 0,
         "started": time.time(),
         "pending_feedback": None,
+        "question_asked": False,
     }
     sessions[player_id] = session
     log.info(f"New session for player {player_id}")
@@ -147,6 +148,7 @@ def _score_answer(session: dict, answered_true: bool) -> str:
         right_answer = "true" if is_true else "false"
         result = f"Ooh, not quite — that one was {right_answer}! {fun_fact}"
     session["current"] += 1
+    session["question_asked"] = False
     return result
 
 
@@ -162,10 +164,6 @@ async def _on_player_update(player) -> None:
     )
     if chapter_key is None or track_key is None:
         return
-    key = (chapter_key, track_key)
-    if _last_seen_track.get(device_id) == key:
-        return
-    _last_seen_track[device_id] = key
     if chapter_key != CHAPTER_GAME:
         return
     if track_key not in (TRACK_TRUE, TRACK_FALSE):
@@ -174,6 +172,22 @@ async def _on_player_update(player) -> None:
     session = get_session(pid)
     if not session:
         log.warning(f"Landing event for {pid} with no active session, ignoring")
+        return
+    dedup_signal = (chapter_key, track_key, event.event_utc, event.request_id)
+    if _last_seen_track.get(device_id) == dedup_signal:
+        return
+    _last_seen_track[device_id] = dedup_signal
+    if track_key == TRACK_TRUE and (not session.get("question_asked")):
+        log.info(f"Player {pid} arrived in Game chapter, redirecting to Question")
+        try:
+            await yoto_client.play_card(
+                device_id,
+                YOTO_CARD_ID,
+                chapter_key=CHAPTER_GAME,
+                track_key=TRACK_QUESTION,
+            )
+        except Exception:
+            log.exception(f"Failed to redirect player {pid} to Question on arrival")
         return
     answered_true = track_key == TRACK_TRUE
     log.info(f"Player {pid} answered {('True' if answered_true else 'False')}")
@@ -272,6 +286,7 @@ async def question(request: Request):
     feedback = session.pop("pending_feedback", None)
     prefix = f"{feedback} " if feedback else ""
     text = f"{prefix}Question {num}. {statement} Press the right button for true, or the left button for false."
+    session["question_asked"] = True
     return audio_response(text)
 
 
