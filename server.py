@@ -75,6 +75,7 @@ TRACK_TRUE = "03"
 sessions: dict[str, dict] = {}
 yoto_client: YotoClient | None = None
 YOTO_CARD_ID = os.getenv("YOTO_CARD_ID")
+SILENCE_URL = os.getenv("SILENCE_URL", "https://raw.githubusercontent.com/Ciaralooney/Yoto-Interactive-Trivia-Card/main/silence.mp3")
 _last_seen_track: dict[str, tuple[int, bool, str, str]] = {}
 
 
@@ -147,7 +148,7 @@ def _score_answer(session: dict, answered_true: bool) -> str:
         result = f"Yes, that's correct! {fun_fact} You've got {score} right so far."
     else:
         right_answer = "true" if is_true else "false"
-        result = f"Ooh, not quite — that one was {right_answer}! {fun_fact}"
+        result = f"Ooh, not quite, that one was {right_answer}! {fun_fact}"
     session["current"] += 1
     session["question_asked"] = False
     return result
@@ -215,12 +216,12 @@ async def _start_mqtt():
     global yoto_client
     if not (YOTO_CLIENT_ID and YOTO_REFRESH_TOKEN and YOTO_DEVICE_ID):
         log.warning(
-            "YOTO_CLIENT_ID / YOTO_REFRESH_TOKEN / YOTO_DEVICE_ID not all set — MQTT branching is disabled. The server will still stream audio, but answers won't be detected."
+            "YOTO_CLIENT_ID / YOTO_REFRESH_TOKEN / YOTO_DEVICE_ID not all set, MQTT branching is disabled. The server will still stream audio, but answers won't be detected."
         )
         return
     if not YOTO_CARD_ID:
         log.warning(
-            "YOTO_CARD_ID not set — MQTT branching is disabled until it's configured, since we need it to know which card to redirect playback on."
+            "YOTO_CARD_ID not set, MQTT branching is disabled until it's configured, since we need it to know which card to redirect playback on."
         )
         return
     try:
@@ -230,14 +231,14 @@ async def _start_mqtt():
         await client.update_player_list()
         if YOTO_DEVICE_ID not in client.players:
             log.warning(
-                f"YOTO_DEVICE_ID {YOTO_DEVICE_ID} not found in account's device list ({list(client.players)}) — check the ID is correct."
+                f"YOTO_DEVICE_ID {YOTO_DEVICE_ID} not found in account's device list ({list(client.players)}) Check the ID is correct."
             )
         yoto_client = client
         await yoto_client.connect_events([YOTO_DEVICE_ID], on_update=_on_player_update)
         log.info(f"MQTT connected for device {YOTO_DEVICE_ID}")
     except Exception:
         log.exception(
-            "Failed to start MQTT — branching will be disabled, but audio streaming will still work."
+            "Failed to start MQTT  branching will be disabled, but audio streaming will still work."
         )
         try:
             await client.close()
@@ -293,12 +294,16 @@ async def question(request: Request):
 
 @app.get("/true")
 async def true_placeholder(request: Request):
-    return audio_response(" ")
+    resp = requests.get(SILENCE_URL, stream=True, timeout=10)
+    resp.raise_for_status()
+    return StreamingResponse(resp.iter_content(chunk_size=4096), media_type="audio/mpeg")
 
 
 @app.get("/false")
 async def false_placeholder(request: Request):
-    return audio_response(" ")
+    resp = requests.get(SILENCE_URL, stream=True, timeout=10)
+    resp.raise_for_status()
+    return StreamingResponse(resp.iter_content(chunk_size=4096), media_type="audio/mpeg")
 
 
 @app.get("/score")
@@ -307,22 +312,22 @@ async def score(request: Request):
     session = get_session(pid)
     if not session:
         return audio_response(
-            "I couldn't find your score — sorry about that! Insert the card again to play."
+            "I couldn't find your score. sorry about that! Insert the card again to play."
         )
     s = session["score"]
     total = QUESTIONS_PER_GAME
     if s == total:
         verdict = (
-            "Absolutely perfect! A flawless ten out of ten — you're a trivia genius!"
+            "Absolutely perfect! A flawless ten out of ten. you're a trivia genius!"
         )
     elif s >= 8:
-        verdict = f"Amazing! {s} out of {total} — you really know your stuff!"
+        verdict = f"Amazing! {s} out of {total}. you really know your stuff!"
     elif s >= 6:
-        verdict = f"Great effort! {s} out of {total} — well done!"
+        verdict = f"Great effort! {s} out of {total}. well done!"
     elif s >= 4:
-        verdict = f"Not bad! {s} out of {total} — keep practising and you'll smash it next time!"
+        verdict = f"Not bad! {s} out of {total}. Keep practising and you'll smash it next time!"
     else:
-        verdict = f"You got {s} out of {total}. Keep going — every game you'll learn something new!"
+        verdict = f"You got {s} out of {total}. Keep going every game you'll learn something new!"
     text = f"Game over! {verdict} Insert the card again whenever you want to play a brand new game. See you next time!"
     sessions.pop(pid, None)
     _last_seen_track.pop(pid, None)
